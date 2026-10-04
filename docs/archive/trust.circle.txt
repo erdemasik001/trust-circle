@@ -1,0 +1,56 @@
+● Proje Adı: Trust Circle
+
+● Hedef Track (Kategori): Multi-Track (Yüksek ödüllü 4 ana hedef): * World (20.000$): En İyi Mini Uygulama ödülü (MiniKit entegrasyonu ile). 
+
+
+LayerZero (20.000$): Omnichain Identity & State (Zincirler arası güven verisi taşıma). 
+
+
+Circle (10.000$): En İyi USDC Kullanımı (Kredilerin USDC ile dağıtılması). 
+
+
+ENS (10.000$): Kullanıcıların .eth isimleri üzerinden birbirini tanıması ve borçlanması. 
+
+● Problem: * Mevcut DeFi kredi protokolleri (Aave vb.) "aşırı teminatlandırma" (over-collateralization) gerektirir; yani 100 dolar borç almak için 150 dolarlık varlığı kilitlemeniz gerekir. 
+
+Kripto dünyasında "sosyal güven" (arkadaşın arkadaşa borç vermesi) mekanizması yoktur çünkü bot hesaplar (Sybil) ve anonimlik riski çok yüksektir. 
+
+Düşük miktarlı (mikro-kredi) işlemlerinde gas ücretleri, borç alınan miktardan daha fazla tutmaktadır. 
+
+● Çözüm: * Trust Circle, World ID (Proof of Personhood) kullanarak sadece "gerçek insanların" katılabildiği bir Teminatsız Sosyal Kredi ağıdır. 
+
+Kullanıcılar birbirlerine "Güven Limiti" tanımlayarak bir "Güven Çemberi" oluşturur. 
+
+Eğer bir kullanıcı yeterli sayıda arkadaştan (örneğin 3 kişi) onay/vouch alırsa, havuzdan teminat vermeden anlık USDC kredisi çekebilir. 
+
+
+LayerZero sayesinde bu güven puanı her zincirde geçerli olur; kullanıcı Base ağında güven kazanıp Arbitrum ağında kredi kullanabilir. 
+
+● Teknik Stack: * Frontend: Next.js + Tailwind CSS (World App içindeki MiniKit ile uyumlu). 
+
+
+Identity & UX: World MiniKit SDK (World ID doğrulama + Pay komutu). 
+
+
+Omnichain Messaging: LayerZero V2 (lzRead ile zincirler arası güven verisi okuma). 
+
+
+Stablecoin: Circle USDC (Kredi birimi). 
+
+
+Naming: ENS (Kullanıcı profilleri). 
+
+
+Blockchain: World Chain (Gas ücretlerini World App karşıladığı için ücretsiz işlem). 
+
+● MVP (Kritik Özellikler – 2-3 günde bitmesi şart olanlar): 1.  World ID Login: MiniKit ile kullanıcı girişi ve "Gerçek İnsan" (Proof of Personhood) onayı. 
+2.  Kefil Olma (Vouching): Bir kullanıcının diğerine ENS adı üzerinden güven limiti tanımlaması ve bunun akıllı sözleşmeye işlenmesi. 
+3.  Mikro-Ödeme (Disbursement): Tanımlanan limit dahilinde minikit.pay komutu ile USDC kredisinin cüzdana gas ücreti ödemeden aktarılması. 
+
+● Neden Kazanırız?: * Gerçek Kullanım Senaryosu: DeFi'nin en büyük eksiği olan "teminatsız borçlanmayı" World ID'nin 23 milyonluk hazır kullanıcı kitlesine indiriyoruz. 
+
+
+Sıfır Sürtünme (Zero Friction): Kullanıcı cüzdan kurmakla veya gas ücretiyle uğraşmaz; her şey World App içinde tanıdık bir mobil uygulama deneyimiyle gerçekleşir. 
+
+
+Teknik Derinlik: Sadece basit bir transfer değil, LayerZero ile zincirler arası "Güven Durumu" (State) yönetimi yapıyoruz.

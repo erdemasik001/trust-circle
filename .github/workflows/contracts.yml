@@ -1,0 +1,44 @@
+name: contracts
+
+on:
+  push:
+    paths: ["contracts/**", ".github/workflows/contracts.yml"]
+  pull_request:
+    paths: ["contracts/**", ".github/workflows/contracts.yml"]
+
+env:
+  ARC_FOUNDRY_VERSION: v0.8.0-2
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Arc Foundry
+        working-directory: ${{ runner.temp }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          asset="arc-foundry-${ARC_FOUNDRY_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          gh release download "$ARC_FOUNDRY_VERSION" -R circlefin/arc-foundry -p "$asset" -p "$asset.sha256"
+          sha256sum -c "$asset.sha256"
+          tar -xzf "$asset"
+          mkdir -p "$HOME/.local/bin"
+          mv forge "$HOME/.local/bin/arc-forge"; mv cast "$HOME/.local/bin/arc-cast"; mv anvil "$HOME/.local/bin/arc-anvil"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - run: arc-forge fmt --check
+      - run: arc-forge build --sizes
+      - run: arc-forge test -vvv --network arc
+
+      - name: Fork test against Arc testnet USDC
+        env:
+          ARC_TESTNET_RPC_URL: https://rpc.testnet.arc.io
+        run: arc-forge test --match-path 'test/fork/*' --network arc -vvv

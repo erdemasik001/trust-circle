@@ -1,16 +1,15 @@
-# Foundry
-out/
-cache/
-broadcast/*/31337/
-
-# Env / anahtarlar
 .env
 .env.*
 !.env.example
-
-# Node / Next.js
-node_modules/
-.next/
-.vercel/
-
 .DS_Store
+
+# foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/31337/
+contracts/broadcast/**/dry-run/
+
+# web
+web/node_modules/
+web/.next/
+web/next-env.d.ts
