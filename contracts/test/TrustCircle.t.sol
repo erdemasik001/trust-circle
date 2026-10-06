@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {TrustCircle} from "../src/TrustCircle.sol";
 import {MockUSDC} from "./mocks/MockUSDC.sol";
@@ -451,6 +452,12 @@ contract LoanTest is TrustCircleTestBase {
         _register(second);
         _vouch(second, borrower, 300e6);
         vm.warp(block.timestamp + DELAY);
+        assertEq(tc.availableLimit(borrower), 100e6); // 40 + 200, clipped by the beta per-user max
+
+        vm.prank(owner);
+        tc.setBetaConfig(
+            TrustCircle.BetaConfig({maxBorrowPerUser: 1_000e6, tvlCap: 50_000e6, maxTierOpen: TrustCircle.Tier.Leader})
+        );
         assertEq(tc.availableLimit(borrower), 40e6 + 200e6); // second capped at 40% of 500
     }
 
@@ -696,5 +703,172 @@ contract LiquidationTest is TrustCircleTestBase {
         vm.prank(voucher);
         tc.revokeVouch(borrower);
         _assertSolvent();
+    }
+}
+
+contract BetaTest is TrustCircleTestBase {
+    function setUp() public override {
+        super.setUp();
+        _register(borrower);
+        _register(voucher);
+    }
+
+    function _setBeta(uint256 maxBorrow, uint256 tvl, TrustCircle.Tier tier) internal {
+        vm.prank(owner);
+        tc.setBetaConfig(
+            TrustCircle.BetaConfig({maxBorrowPerUser: uint128(maxBorrow), tvlCap: uint128(tvl), maxTierOpen: tier})
+        );
+    }
+
+    function test_beta_defaultsAreMainnetBetaValues() public view {
+        (uint128 maxBorrow, uint128 tvl, TrustCircle.Tier tier) = tc.betaConfig();
+        assertEq(maxBorrow, 100e6);
+        assertEq(tvl, 2_000e6);
+        assertEq(uint8(tier), uint8(TrustCircle.Tier.Rising));
+    }
+
+    function test_beta_tvlCapReverts() public {
+        _setBeta(100e6, 50e6, TrustCircle.Tier.Rising);
+        _vouch(voucher, borrower, 50e6);
+        usdc.mint(voucher, 1e6);
+        vm.startPrank(voucher);
+        usdc.approve(address(tc), 1e6);
+        vm.expectRevert(abi.encodeWithSelector(TrustCircle.TvlCapReached.selector, 50e6));
+        tc.vouchForUser(borrower, 1e6);
+        vm.stopPrank();
+    }
+
+    function test_beta_tvlCapFreesUpAfterWithdraw() public {
+        _setBeta(100e6, 50e6, TrustCircle.Tier.Rising);
+        _vouch(voucher, borrower, 50e6);
+        vm.prank(voucher);
+        tc.withdraw(borrower, 10e6);
+        _vouch(voucher, borrower, 10e6);
+        assertEq(tc.totalStaked(), 50e6);
+    }
+
+    function test_beta_maxBorrowPerUserClipsLimit() public {
+        _setBeta(30e6, 2_000e6, TrustCircle.Tier.Rising);
+        _vouch(voucher, borrower, 40e6);
+        vm.warp(block.timestamp + DELAY);
+        assertEq(tc.availableLimit(borrower), 30e6);
+        vm.prank(borrower);
+        vm.expectRevert(abi.encodeWithSelector(TrustCircle.ExceedsLimit.selector, 31e6, 30e6));
+        tc.borrow(31e6);
+    }
+
+    function test_beta_maxTierOpenAppliesLowerTierTerms() public {
+        _setBeta(100e6, 2_000e6, TrustCircle.Tier.Newcomer);
+        _vouch(voucher, borrower, 40e6);
+        vm.warp(block.timestamp + DELAY);
+        for (uint256 i; i < 5; ++i) {
+            vm.prank(borrower);
+            tc.borrow(1e6);
+            _repay(borrower);
+        }
+        assertEq(uint8(tc.tierOf(borrower)), uint8(TrustCircle.Tier.Rising));
+        assertEq(uint8(tc.effectiveTierOf(borrower)), uint8(TrustCircle.Tier.Newcomer));
+        // Newcomer terms: one voucher is enough and interest stays 15%.
+        assertEq(tc.availableLimit(borrower), 40e6);
+        vm.prank(borrower);
+        tc.borrow(10e6);
+        (, uint128 interest,,,) = tc.loans(borrower);
+        assertEq(interest, 1.5e6);
+    }
+
+    function test_beta_aboveHardCapReverts() public {
+        vm.startPrank(owner);
+        vm.expectRevert(TrustCircle.AboveHardCap.selector);
+        tc.setBetaConfig(
+            TrustCircle.BetaConfig({
+                maxBorrowPerUser: 1_000e6 + 1, tvlCap: 2_000e6, maxTierOpen: TrustCircle.Tier.Rising
+            })
+        );
+        vm.expectRevert(TrustCircle.AboveHardCap.selector);
+        tc.setBetaConfig(
+            TrustCircle.BetaConfig({
+                maxBorrowPerUser: 100e6, tvlCap: 50_000e6 + 1, maxTierOpen: TrustCircle.Tier.Rising
+            })
+        );
+        vm.stopPrank();
+    }
+
+    function test_beta_onlyOwner() public {
+        vm.prank(voucher);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, voucher));
+        tc.setBetaConfig(
+            TrustCircle.BetaConfig({maxBorrowPerUser: 100e6, tvlCap: 2_000e6, maxTierOpen: TrustCircle.Tier.Rising})
+        );
+    }
+}
+
+contract PauseTest is TrustCircleTestBase {
+    function setUp() public override {
+        super.setUp();
+        _register(borrower);
+        _register(voucher);
+    }
+
+    function test_pause_blocksEntries() public {
+        _vouch(voucher, borrower, 20e6);
+        vm.warp(block.timestamp + DELAY);
+        vm.prank(owner);
+        tc.pause();
+
+        address newcomer = makeAddr("newcomer");
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory sig = _sign(attesterKey, newcomer, 99, deadline);
+        vm.prank(newcomer);
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        tc.register(99, deadline, sig);
+
+        usdc.mint(voucher, 5e6);
+        vm.startPrank(voucher);
+        usdc.approve(address(tc), 5e6);
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        tc.vouchForUser(borrower, 5e6);
+        vm.stopPrank();
+
+        vm.prank(borrower);
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        tc.borrow(1e6);
+
+        vm.prank(owner);
+        tc.unpause();
+        vm.prank(borrower);
+        tc.borrow(1e6);
+    }
+
+    function test_pause_exitsStayOpen() public {
+        address other = makeAddr("other");
+        _register(other);
+        _vouch(voucher, borrower, 20e6);
+        _vouch(voucher, other, 20e6);
+        vm.warp(block.timestamp + DELAY);
+        vm.prank(borrower);
+        tc.borrow(10e6);
+        vm.prank(other);
+        tc.borrow(10e6);
+
+        vm.prank(owner);
+        tc.pause();
+
+        _repay(borrower); // repay
+        vm.prank(voucher);
+        tc.claim(); // claim
+        vm.prank(voucher);
+        tc.withdraw(borrower, 20e6); // withdraw
+
+        vm.warp(block.timestamp + tc.LOAN_DURATION() + tc.GRACE_PERIOD() + 1);
+        vm.prank(voucher);
+        tc.liquidate(other); // liquidate
+        assertEq(uint8(_status(other)), uint8(TrustCircle.LoanStatus.Defaulted));
+        _assertSolvent();
+    }
+
+    function test_pause_onlyOwner() public {
+        vm.prank(voucher);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, voucher));
+        tc.pause();
     }
 }

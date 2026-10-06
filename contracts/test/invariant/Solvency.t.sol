@@ -30,7 +30,10 @@ contract Handler is Test {
         address to = _actor(toSeed);
         if (from == to || tc.hasDefaulted(to) || tc.getVouch(from, to).locked != 0) return;
         if (tc.getVouch(from, to).amount == 0 && tc.getVouchers(to).length >= tc.MAX_VOUCHERS_PER_BORROWER()) return;
-        amount = bound(amount, tc.MIN_VOUCH(), 200e6);
+        (, uint128 tvlCap,) = tc.betaConfig();
+        uint256 room = tvlCap - tc.totalStaked();
+        if (room < tc.MIN_VOUCH()) return;
+        amount = bound(amount, tc.MIN_VOUCH(), room < 200e6 ? room : 200e6);
         usdc.mint(from, amount);
         vm.startPrank(from);
         usdc.approve(address(tc), amount);

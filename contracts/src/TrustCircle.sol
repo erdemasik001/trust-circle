@@ -5,6 +5,7 @@ import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
@@ -14,7 +15,7 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 /// @dev Vouchers escrow USDC for a borrower; the escrow sets the borrower's limit and funds the loan.
 ///      All payouts to vouchers (interest, leftover stake, compensation) are pull-based via `claim()`, so a
 ///      blocklisted voucher can never block a repayment or a liquidation.
-contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
+contract TrustCircle is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
 
@@ -46,6 +47,13 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
         uint64 startedAt;
         uint64 dueAt;
         LoanStatus status;
+    }
+
+    /// @notice Owner-tunable limits for the unaudited mainnet beta, bounded by the HARD_CAP_* constants.
+    struct BetaConfig {
+        uint128 maxBorrowPerUser; // USDC, 6 decimals
+        uint128 tvlCap; // max total escrow (totalStaked), USDC
+        Tier maxTierOpen; // users above it borrow with this tier's terms
     }
 
     struct TierParams {
@@ -83,6 +91,10 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
     /// @notice The circuit breaker only arms once this much principal has been lent.
     uint256 public constant CIRCUIT_BREAKER_MIN_VOLUME = 1_000e6;
 
+    uint256 public constant HARD_CAP_MAX_BORROW_PER_USER = 1_000e6;
+    uint256 public constant HARD_CAP_TVL = 50_000e6;
+    Tier public constant HARD_CAP_TIER = Tier.Leader;
+
     // ─── Immutables ──────────────────────────────────────────────────────
 
     IERC20 public immutable usdc;
@@ -92,6 +104,7 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
     // ─── Storage ─────────────────────────────────────────────────────────
 
     address public attester;
+    BetaConfig public betaConfig;
 
     mapping(uint256 nullifierHash => bool) public usedNullifier;
     mapping(address account => bool) public isHuman;
@@ -117,6 +130,7 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
     // ─── Events ──────────────────────────────────────────────────────────
 
     event AttesterUpdated(address indexed previous, address indexed current);
+    event BetaConfigUpdated(uint256 maxBorrowPerUser, uint256 tvlCap, Tier maxTierOpen);
     event Registered(address indexed account, uint256 indexed nullifierHash);
     event Vouched(address indexed voucher, address indexed borrower, uint256 amount, uint256 activatesAt);
     event Withdrawn(address indexed voucher, address indexed borrower, uint256 amount);
@@ -130,6 +144,8 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
     // ─── Errors ──────────────────────────────────────────────────────────
 
     error ZeroAddress();
+    error AboveHardCap();
+    error TvlCapReached(uint256 cap);
     error AttestationExpired();
     error BadAttestation();
     error NullifierUsed();
@@ -161,13 +177,14 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
         attester = attester_;
         activationDelay = activationDelay_;
         emit AttesterUpdated(address(0), attester_);
+        _setBetaConfig(BetaConfig({maxBorrowPerUser: 100e6, tvlCap: 2_000e6, maxTierOpen: Tier.Rising}));
     }
 
     // ─── Identity ────────────────────────────────────────────────────────
 
     /// @notice Registers `msg.sender` as a unique human using an attestation signed by the attester
     ///         after it verified a World ID proof whose signal was this wallet.
-    function register(uint256 nullifierHash, uint256 deadline, bytes calldata signature) external {
+    function register(uint256 nullifierHash, uint256 deadline, bytes calldata signature) external whenNotPaused {
         if (block.timestamp > deadline) revert AttestationExpired();
         if (isHuman[msg.sender]) revert AlreadyRegistered();
         if (usedNullifier[nullifierHash]) revert NullifierUsed();
@@ -187,11 +204,27 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
         attester = attester_;
     }
 
+    // ─── Beta controls ───────────────────────────────────────────────────
+
+    function setBetaConfig(BetaConfig calldata config) external onlyOwner {
+        _setBetaConfig(config);
+    }
+
+    /// @notice Stops new registrations, vouches and loans. Repay, withdraw, claim and liquidate never pause,
+    ///         so everyone can always get out.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     // ─── Vouching ────────────────────────────────────────────────────────
 
     /// @notice Escrows `amount` USDC as a stake for `borrower`. A top-up restarts the activation delay
     ///         for the whole vouch, and is only allowed while none of it is lent out.
-    function vouchForUser(address borrower, uint256 amount) external nonReentrant {
+    function vouchForUser(address borrower, uint256 amount) external nonReentrant whenNotPaused {
         if (!isHuman[msg.sender]) revert NotHuman(msg.sender);
         if (!isHuman[borrower]) revert NotHuman(borrower);
         if (borrower == msg.sender) revert SelfVouch();
@@ -208,6 +241,7 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
         v.amount += amount.toUint128();
         v.activatesAt = (block.timestamp + activationDelay).toUint64();
         totalStaked += amount;
+        if (totalStaked > betaConfig.tvlCap) revert TvlCapReached(betaConfig.tvlCap);
 
         usdc.safeTransferFrom(msg.sender, address(this), amount);
         emit Vouched(msg.sender, borrower, v.amount, v.activatesAt);
@@ -238,14 +272,14 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
 
     /// @notice Borrows `amount` USDC from the caller's vouchers' escrow, locked pro rata to what each backs.
     ///         The borrower receives `amount` minus the 1% insurance fee and owes `amount` plus tier interest.
-    function borrow(uint256 amount) external nonReentrant {
+    function borrow(uint256 amount) external nonReentrant whenNotPaused {
         if (!isHuman[msg.sender]) revert NotHuman(msg.sender);
         if (hasDefaulted[msg.sender]) revert BorrowerDefaulted();
         if (loans[msg.sender].status == LoanStatus.Active) revert ActiveLoan();
         if (amount == 0) revert ZeroAmount();
         if (isCircuitBreakerTripped()) revert CircuitBreakerTripped();
 
-        TierParams memory tp = tierParams(tierOf(msg.sender));
+        TierParams memory tp = tierParams(effectiveTierOf(msg.sender));
         address[] storage vs = _vouchers[msg.sender];
         uint256 n = vs.length;
         uint256[] memory contrib = new uint256[](n);
@@ -255,7 +289,7 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
 
         // Lock pro rata to each voucher's contribution, then hand out rounding dust where there is room.
         uint256[] memory share = new uint256[](n);
-        uint256 assigned;
+        uint256 assigned = 0;
         for (uint256 i; i < n; ++i) {
             share[i] = amount * contrib[i] / total;
             assigned += share[i];
@@ -299,7 +333,7 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
         bool onTime = block.timestamp <= loan.dueAt;
         loan.status = LoanStatus.Repaid;
 
-        uint256 distributed;
+        uint256 distributed = 0;
         address[] storage vs = _vouchers[msg.sender];
         for (uint256 i; i < vs.length; ++i) {
             Vouch storage v = _vouches[vs[i]][msg.sender];
@@ -340,7 +374,7 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
         reputation[borrower] = 0;
         totalDefaulted += principal;
 
-        uint256 stakeReleased;
+        uint256 stakeReleased = 0;
         address[] storage vs = _vouchers[borrower];
         for (uint256 i; i < vs.length; ++i) {
             address voucher = vs[i];
@@ -399,6 +433,12 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
         return Tier.Newcomer;
     }
 
+    /// @notice The tier whose terms apply during the beta: `tierOf` capped at `betaConfig.maxTierOpen`.
+    function effectiveTierOf(address account) public view returns (Tier) {
+        Tier tier = tierOf(account);
+        return tier > betaConfig.maxTierOpen ? betaConfig.maxTierOpen : tier;
+    }
+
     function tierParams(Tier tier) public pure returns (TierParams memory) {
         if (tier == Tier.Leader) return TierParams({maxBorrow: 5_000e6, minVouchers: 5, interestBps: 800});
         if (tier == Tier.Trusted) return TierParams({maxBorrow: 2_000e6, minVouchers: 3, interestBps: 1_000});
@@ -410,7 +450,7 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
     ///         or zero without enough active vouchers, with an open loan, or after a default.
     function availableLimit(address borrower) external view returns (uint256) {
         if (!isHuman[borrower] || hasDefaulted[borrower] || loans[borrower].status == LoanStatus.Active) return 0;
-        TierParams memory tp = tierParams(tierOf(borrower));
+        TierParams memory tp = tierParams(effectiveTierOf(borrower));
         uint256[] memory contrib = new uint256[](_vouchers[borrower].length);
         uint256 total = _contributions(borrower, tp, contrib);
         return _limit(total, contrib, tp);
@@ -447,13 +487,22 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
         }
     }
 
-    function _limit(uint256 total, uint256[] memory contrib, TierParams memory tp) internal pure returns (uint256) {
-        uint256 active;
+    function _limit(uint256 total, uint256[] memory contrib, TierParams memory tp) internal view returns (uint256) {
+        uint256 active = 0;
         for (uint256 i; i < contrib.length; ++i) {
             if (contrib[i] != 0) ++active;
         }
         if (active < tp.minVouchers) return 0;
-        return _min(total, tp.maxBorrow);
+        return _min(_min(total, tp.maxBorrow), betaConfig.maxBorrowPerUser);
+    }
+
+    function _setBetaConfig(BetaConfig memory config) internal {
+        if (
+            config.maxBorrowPerUser > HARD_CAP_MAX_BORROW_PER_USER || config.tvlCap > HARD_CAP_TVL
+                || config.maxTierOpen > HARD_CAP_TIER
+        ) revert AboveHardCap();
+        betaConfig = config;
+        emit BetaConfigUpdated(config.maxBorrowPerUser, config.tvlCap, config.maxTierOpen);
     }
 
     function _removeVoucher(address borrower, address voucher) internal {
