@@ -552,26 +552,18 @@ contract LiquidationTest is TrustCircleTestBase {
         tc.liquidate(borrower);
     }
 
-    function test_liquidate_selfReverts() public {
-        _defaultLoan(20e6, 10e6);
-        vm.prank(borrower);
-        vm.expectRevert(TrustCircle.SelfLiquidation.selector);
-        tc.liquidate(borrower);
-    }
-
-    function test_liquidate_settlesVouchersAndPaysKeeper() public {
+    function test_liquidate_settlesVouchersAndLeavesPool() public {
         _fundInsurance(5); // 5 × 0.2 = 1 USDC in the pool
         _defaultLoan(20e6, 10e6); // pool 1.1
-        uint256 poolBefore = tc.insurancePool();
-        assertEq(poolBefore, 1.1e6);
+        assertEq(tc.insurancePool(), 1.1e6);
 
         vm.prank(keeper);
         tc.liquidate(borrower);
 
-        // Reward 2% of 10 = 0.2; cover min(30% of 10, 0.9) = 0.9; unlent stake 10 back.
-        assertEq(usdc.balanceOf(keeper), 0.2e6);
-        assertEq(tc.claimable(voucher), 10e6 + 0.9e6);
-        assertEq(tc.insurancePool(), 0);
+        // No reward, no automatic cover: the unlent 10 USDC is all that comes back.
+        assertEq(usdc.balanceOf(keeper), 0);
+        assertEq(tc.claimable(voucher), 10e6);
+        assertEq(tc.insurancePool(), 1.1e6);
         assertEq(uint8(_status(borrower)), uint8(TrustCircle.LoanStatus.Defaulted));
         assertTrue(tc.hasDefaulted(borrower));
         assertEq(tc.reputation(borrower), 0);
@@ -589,14 +581,52 @@ contract LiquidationTest is TrustCircleTestBase {
         tc.vouchForUser(borrower, 1e6);
     }
 
-    function test_liquidate_coverCappedAt30Percent() public {
-        _fundInsurance(25); // 5 USDC in the pool
+    /// @dev One person with three Device-level identities (voucher, borrower, keeper) defaults to themselves.
+    ///      They must not end up with more USDC than they started with.
+    function test_liquidate_sybilDefaultGainsNothing() public {
+        _fundInsurance(25); // 5 USDC of other people's fees sit in the pool
+
+        uint256 stake = 40e6;
+        _vouch(voucher, borrower, stake); // minted: the attacker's own 40 USDC
+        vm.warp(block.timestamp + DELAY);
+        vm.prank(borrower);
+        tc.borrow(40e6);
+        vm.warp(block.timestamp + tc.LOAN_DURATION() + tc.GRACE_PERIOD() + 1);
+
+        vm.prank(keeper);
+        tc.liquidate(borrower);
+        if (tc.claimable(voucher) != 0) {
+            vm.prank(voucher);
+            tc.claim();
+        }
+
+        uint256 attackerAfter = usdc.balanceOf(voucher) + usdc.balanceOf(borrower) + usdc.balanceOf(keeper);
+        assertLt(attackerAfter, stake); // lost the 1% fee
+        assertEq(tc.insurancePool(), 5.4e6); // pool untouched, plus the attacker's own fee
+        _assertSolvent();
+    }
+
+    function test_compensate_movesPoolToClaimable() public {
+        _fundInsurance(5);
         _defaultLoan(20e6, 10e6);
         vm.prank(keeper);
         tc.liquidate(borrower);
-        assertEq(tc.claimable(voucher), 10e6 + 3e6);
-        assertEq(tc.insurancePool(), 5.1e6 - 0.2e6 - 3e6);
+
+        vm.prank(owner);
+        tc.compensate(voucher, 1e6);
+        assertEq(tc.claimable(voucher), 11e6);
+        assertEq(tc.insurancePool(), 0.1e6);
         _assertSolvent();
+
+        vm.prank(owner);
+        vm.expectRevert(TrustCircle.ExceedsInsurancePool.selector);
+        tc.compensate(voucher, 0.1e6 + 1);
+    }
+
+    function test_compensate_onlyOwner() public {
+        vm.prank(voucher);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, voucher));
+        tc.compensate(voucher, 0);
     }
 
     function test_liquidate_succeedsWithBlocklistedVoucher() public {

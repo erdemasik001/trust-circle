@@ -12,7 +12,7 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 /// @title Trust Circle
 /// @notice Uncollateralized USDC micro-loans between verified humans, backed by friends who vouch.
 /// @dev Vouchers escrow USDC for a borrower; the escrow sets the borrower's limit and funds the loan.
-///      All payouts to vouchers (interest, leftover stake, insurance) are pull-based via `claim()`, so a
+///      All payouts to vouchers (interest, leftover stake, compensation) are pull-based via `claim()`, so a
 ///      blocklisted voucher can never block a repayment or a liquidation.
 contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
     using SafeERC20 for IERC20;
@@ -71,8 +71,6 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
 
     uint256 public constant INSURANCE_FEE_BPS = 100; // 1% of principal, taken at borrow
     uint256 public constant VOUCHER_INTEREST_BPS = 8_000; // 80% of interest; the rest is protocol fee
-    uint256 public constant LIQUIDATION_REWARD_BPS = 200; // 2% of principal, paid from the insurance pool
-    uint256 public constant INSURANCE_COVER_BPS = 3_000; // up to 30% of vouchers' loss, from the insurance pool
 
     uint256 public constant INITIAL_REPUTATION = 100;
     uint256 public constant REPAY_REPUTATION_GAIN = 10;
@@ -124,7 +122,8 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
     event Withdrawn(address indexed voucher, address indexed borrower, uint256 amount);
     event Borrowed(address indexed borrower, uint256 principal, uint256 interest, uint256 dueAt);
     event Repaid(address indexed borrower, uint256 principal, uint256 interest, bool onTime);
-    event Liquidated(address indexed borrower, address indexed liquidator, uint256 principal, uint256 reward);
+    event Liquidated(address indexed borrower, address indexed liquidator, uint256 principal);
+    event Compensated(address indexed voucher, uint256 amount);
     event Claimed(address indexed account, uint256 amount);
     event ProtocolFeesWithdrawn(address indexed to, uint256 amount);
 
@@ -148,7 +147,7 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
     error ExceedsLimit(uint256 requested, uint256 limit);
     error CircuitBreakerTripped();
     error NotLiquidatable();
-    error SelfLiquidation();
+    error ExceedsInsurancePool();
     error NothingToClaim();
 
     // ─── Constructor ─────────────────────────────────────────────────────
@@ -323,11 +322,13 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
         emit Repaid(msg.sender, principal, interest, onTime);
     }
 
-    /// @notice Closes a loan that is past due plus the grace period. Vouchers lose the locked stake,
-    ///         get up to 30% of it back from the insurance pool, and their remaining stake for this borrower
-    ///         becomes claimable. The caller (never the borrower) earns a reward from the insurance pool.
+    /// @notice Closes a loan that is past due plus the grace period. Anyone can call it; vouchers have the
+    ///         incentive, since their unlent stake for this borrower stays frozen until then. Vouchers lose the
+    ///         locked stake and the rest of their stake for this borrower becomes claimable.
+    /// @dev No liquidation reward and no automatic insurance payout: with Device-level World ID one person can
+    ///      hold several identities, and any automatic payout from the shared pool would let them drain it by
+    ///      defaulting to themselves. The pool only grows; the owner can compensate vouchers case by case.
     function liquidate(address borrower) external nonReentrant {
-        if (borrower == msg.sender) revert SelfLiquidation();
         Loan storage loan = loans[borrower];
         if (loan.status != LoanStatus.Active || block.timestamp <= loan.dueAt + GRACE_PERIOD) {
             revert NotLiquidatable();
@@ -339,34 +340,25 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
         reputation[borrower] = 0;
         totalDefaulted += principal;
 
-        uint256 reward = _min(principal * LIQUIDATION_REWARD_BPS / BPS, insurancePool);
-        uint256 cover = _min(principal * INSURANCE_COVER_BPS / BPS, insurancePool - reward);
-
-        uint256 coverPaid;
         uint256 stakeReleased;
         address[] storage vs = _vouchers[borrower];
         for (uint256 i; i < vs.length; ++i) {
             address voucher = vs[i];
             Vouch memory v = _vouches[voucher][borrower];
-            uint256 payout = v.amount - v.locked; // the stake that was never lent out
-            stakeReleased += payout;
-            if (v.locked != 0) {
-                uint256 c = cover * v.locked / principal;
-                payout += c;
-                coverPaid += c;
+            uint256 unlent = v.amount - v.locked;
+            if (unlent != 0) {
+                claimable[voucher] += unlent;
+                stakeReleased += unlent;
             }
-            if (payout != 0) claimable[voucher] += payout;
             delete _vouches[voucher][borrower];
         }
         delete _vouchers[borrower];
 
         totalStaked -= principal + stakeReleased;
         totalLocked -= principal;
-        totalClaimable += stakeReleased + coverPaid;
-        insurancePool -= reward + coverPaid;
+        totalClaimable += stakeReleased;
 
-        if (reward != 0) usdc.safeTransfer(msg.sender, reward);
-        emit Liquidated(borrower, msg.sender, principal, reward);
+        emit Liquidated(borrower, msg.sender, principal);
     }
 
     // ─── Payouts ─────────────────────────────────────────────────────────
@@ -378,6 +370,15 @@ contract TrustCircle is Ownable2Step, ReentrancyGuard, EIP712 {
         totalClaimable -= amount;
         usdc.safeTransfer(msg.sender, amount);
         emit Claimed(msg.sender, amount);
+    }
+
+    /// @notice Pays a voucher from the insurance pool after a default, reviewed by the owner.
+    function compensate(address voucher, uint256 amount) external onlyOwner {
+        if (amount > insurancePool) revert ExceedsInsurancePool();
+        insurancePool -= amount;
+        claimable[voucher] += amount;
+        totalClaimable += amount;
+        emit Compensated(voucher, amount);
     }
 
     function withdrawProtocolFees(address to) external nonReentrant onlyOwner {
