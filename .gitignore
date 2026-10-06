@@ -13,3 +13,5 @@ contracts/broadcast/**/dry-run/
 web/node_modules/
 web/.next/
 web/next-env.d.ts
+contracts/broadcast/**/run-[0-9]*.json
+contracts/broadcast/**/*.lock
