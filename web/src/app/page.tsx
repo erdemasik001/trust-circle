@@ -1,3 +1,4 @@
+import Link from "next/link";
 import ConnectButton from "@/components/ConnectButton";
 
 export default function Home() {
@@ -14,7 +15,10 @@ export default function Home() {
           sets your borrowing limit and earns them most of the interest when you repay.
         </p>
       </section>
-      {/* TODO(G5): register, vouch, borrow, repay, profile. */}
+      <Link href="/register" className="self-start rounded-full bg-foreground px-5 py-2 text-background">
+        Get started: register with World ID
+      </Link>
+      {/* TODO(G5): vouch, borrow, repay, profile. */}
     </main>
   );
 }
