@@ -10,6 +10,10 @@ Trust Circle is **unaudited**. The mainnet beta is capped so that the money at r
 | **Owner** (deployer EOA, two-step transfer) | Pause new registrations, vouches and loans; set beta limits up to the hard caps; pay vouchers from the insurance pool (`compensate`); withdraw protocol fees. | Touch vouchers' escrow, claimable balances or loans; pause `repay`, `withdraw`, `claim` or `liquidate`; raise limits above the hard caps. |
 | **World ID (Device level)** | One identity per device, not per person. | — |
 
+### What the attestation API checks
+
+Before the attester signs, `web/src/lib/server/verifyAndAttest.ts` requires: the expected World ID environment (a staging proof never registers on mainnet), the `trustcircle-register` action, exactly one proof of the configured credential, a `signal_hash` equal to the hash of the requesting wallet (so a proof cannot be replayed for another wallet), a successful response from `developer.world.org/api/v4/verify`, and that neither the nullifier nor the wallet is registered on-chain yet. The contract's `usedNullifier` mapping is the nullifier store, so there is no database to keep in sync. Each rule has a unit test, and a TypeScript-signed attestation was accepted by the Solidity contract on a local chain.
+
 ### Why Device level is acceptable
 
 A voucher's stake is their own money, and a loan is funded only by its vouchers' escrow. Someone who vouches for their own second identity and then defaults has just moved their own USDC around, minus the 1% fee and gas. The only shared money is the insurance pool, so the beta pays nothing out of it automatically: there is no liquidation reward and no automatic insurance cover. The owner can compensate vouchers case by case. `test_liquidate_sybilDefaultGainsNothing` checks this.
