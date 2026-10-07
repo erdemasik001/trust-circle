@@ -10,5 +10,5 @@ type Deployment = { trustCircle?: Address };
 // Filled in after deploy (testnet G3, mainnet G4).
 export const deployments: Record<SupportedChainId, Deployment> = {
   [arc.id]: {},
-  [arcTestnet.id]: { trustCircle: "0xefbECEc96fd11c05469B43F5c18975F7Aa571B6F" },
+  [arcTestnet.id]: { trustCircle: "0xe4b2F7fDb7960160C8003409c2a9eb97046A0b06" },
 };

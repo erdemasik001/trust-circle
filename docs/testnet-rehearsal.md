@@ -2,7 +2,7 @@
 
 One full cycle on Arc testnet (chain 5042002) with the deployed, verified contract, driven from the command line with `cast`. Registration used `contracts/script/sign-attestation.sh` (attester-signed invite) instead of the World ID backend.
 
-Contract: [`0xefbECEc96fd11c05469B43F5c18975F7Aa571B6F`](https://testnet.arcscan.app/address/0xefbecec96fd11c05469b43f5c18975f7aa571b6f), 300 s activation delay, default beta config.
+Contract (first testnet deployment, since replaced by [`0xe4b2…0b06`](https://testnet.arcscan.app/address/0xe4b2f7fdb7960160c8003409c2a9eb97046a0b06) with the `MIN_BORROW` and `rejectVouch` fixes): [`0xefbECEc96fd11c05469B43F5c18975F7Aa571B6F`](https://testnet.arcscan.app/address/0xefbecec96fd11c05469b43f5c18975f7aa571b6f), 300 s activation delay, default beta config.
 
 | Step | Who | Transaction | Gas | Fee (USDC) |
 |---|---|---|---|---|
