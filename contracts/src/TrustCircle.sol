@@ -70,6 +70,9 @@ contract TrustCircle is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
     uint256 internal constant BPS = 10_000;
 
     uint256 public constant MIN_VOUCH = 1e6; // 1 USDC
+    /// @notice Smallest loan. Below it the interest and the fee round down to zero, which would make
+    ///         reputation free to farm with dust loans.
+    uint256 public constant MIN_BORROW = 1e6; // 1 USDC
     uint256 public constant MAX_VOUCHERS_PER_BORROWER = 10;
     /// @notice A single voucher can back at most this share of the borrower's tier max.
     uint256 public constant MAX_VOUCHER_SHARE_BPS = 4_000;
@@ -134,6 +137,7 @@ contract TrustCircle is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
     event Registered(address indexed account, uint256 indexed nullifierHash);
     event Vouched(address indexed voucher, address indexed borrower, uint256 amount, uint256 activatesAt);
     event Withdrawn(address indexed voucher, address indexed borrower, uint256 amount);
+    event VouchRejected(address indexed borrower, address indexed voucher, uint256 amount);
     event Borrowed(address indexed borrower, uint256 principal, uint256 interest, uint256 dueAt);
     event Repaid(address indexed borrower, uint256 principal, uint256 interest, bool onTime);
     event Liquidated(address indexed borrower, address indexed liquidator, uint256 principal);
@@ -160,6 +164,8 @@ contract TrustCircle is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
     error NoActiveLoan();
     error BorrowerDefaulted();
     error ZeroAmount();
+    error BorrowTooSmall();
+    error NoVouch();
     error ExceedsLimit(uint256 requested, uint256 limit);
     error CircuitBreakerTripped();
     error NotLiquidatable();
@@ -268,6 +274,22 @@ contract TrustCircle is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
         withdraw(borrower, v.amount);
     }
 
+    /// @notice Lets a borrower turn down a vouch they did not ask for, so strangers cannot fill the
+    ///         MAX_VOUCHERS_PER_BORROWER slots. The stake goes back to the voucher through `claim()`.
+    function rejectVouch(address voucher) external nonReentrant {
+        Vouch storage v = _vouches[voucher][msg.sender];
+        uint256 amount = v.amount;
+        if (amount == 0) revert NoVouch();
+        if (v.locked != 0) revert VouchLocked();
+
+        delete _vouches[voucher][msg.sender];
+        _removeVoucher(msg.sender, voucher);
+        totalStaked -= amount;
+        claimable[voucher] += amount;
+        totalClaimable += amount;
+        emit VouchRejected(msg.sender, voucher, amount);
+    }
+
     // ─── Loans ───────────────────────────────────────────────────────────
 
     /// @notice Borrows `amount` USDC from the caller's vouchers' escrow, locked pro rata to what each backs.
@@ -276,7 +298,7 @@ contract TrustCircle is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
         if (!isHuman[msg.sender]) revert NotHuman(msg.sender);
         if (hasDefaulted[msg.sender]) revert BorrowerDefaulted();
         if (loans[msg.sender].status == LoanStatus.Active) revert ActiveLoan();
-        if (amount == 0) revert ZeroAmount();
+        if (amount < MIN_BORROW) revert BorrowTooSmall();
         if (isCircuitBreakerTripped()) revert CircuitBreakerTripped();
 
         TierParams memory tp = tierParams(effectiveTierOf(msg.sender));

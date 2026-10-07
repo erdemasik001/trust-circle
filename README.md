@@ -14,9 +14,11 @@ Every member is a unique, verified human (World ID). A voucher stakes USDC for s
 
 ## Repository
 ```
-contracts/   Foundry: TrustCircle and tests
+contracts/   Foundry: TrustCircle, tests, deploy + attestation scripts
 web/         Next.js + wagmi + viem
-docs/        archive/ — earlier design notes
+docs/        SECURITY.md — trust assumptions, beta limits, Slither
+             testnet-rehearsal.md — a full cycle on Arc testnet with tx hashes
+             archive/ — earlier design notes
 ```
 
 ## Develop

@@ -51,12 +51,23 @@ contract Handler is Test {
         tc.withdraw(to, bound(amount, 1, free));
     }
 
+    function reject(uint256 borrowerSeed, uint256 voucherSeed) external {
+        address b = _actor(borrowerSeed);
+        address v = _actor(voucherSeed);
+        TrustCircle.Vouch memory vouch = tc.getVouch(v, b);
+        if (vouch.amount == 0 || vouch.locked != 0) return;
+        vm.prank(b);
+        tc.rejectVouch(v);
+    }
+
     function borrow(uint256 seed, uint256 amount) external {
         address who = _actor(seed);
         uint256 limit = tc.availableLimit(who);
-        if (limit == 0 || tc.isCircuitBreakerTripped()) return;
+        uint256 minBorrow = tc.MIN_BORROW();
+        if (limit < minBorrow || tc.isCircuitBreakerTripped()) return;
+        amount = bound(amount, minBorrow, limit); // before the prank: external calls would consume it
         vm.prank(who);
-        tc.borrow(bound(amount, 1, limit));
+        tc.borrow(amount);
         ++borrows;
     }
 

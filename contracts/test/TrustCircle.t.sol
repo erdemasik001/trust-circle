@@ -274,6 +274,50 @@ contract VouchTest is TrustCircleTestBase {
         assertEq(usdc.balanceOf(vs[0]), 1e6);
     }
 
+    function test_rejectVouch_returnsStakeViaClaim() public {
+        _vouch(voucher, borrower, 20e6);
+        vm.prank(borrower);
+        tc.rejectVouch(voucher);
+        assertEq(tc.getVouch(voucher, borrower).amount, 0);
+        assertEq(tc.getVouchers(borrower).length, 0);
+        assertEq(tc.totalStaked(), 0);
+        assertEq(tc.claimable(voucher), 20e6);
+        _assertSolvent();
+
+        vm.prank(voucher);
+        tc.claim();
+        assertEq(usdc.balanceOf(voucher), 20e6);
+    }
+
+    function test_rejectVouch_freesSlotFromGriefers() public {
+        address[10] memory griefers;
+        for (uint256 i; i < 10; ++i) {
+            griefers[i] = makeAddr(string.concat("g", vm.toString(i)));
+            _register(griefers[i]);
+            _vouch(griefers[i], borrower, 1e6);
+        }
+        vm.prank(borrower);
+        tc.rejectVouch(griefers[3]);
+        _vouch(voucher, borrower, 20e6); // the real friend gets in
+        assertEq(tc.getVouchers(borrower).length, 10);
+    }
+
+    function test_rejectVouch_lockedReverts() public {
+        _vouch(voucher, borrower, 20e6);
+        vm.warp(block.timestamp + DELAY);
+        vm.startPrank(borrower);
+        tc.borrow(5e6);
+        vm.expectRevert(TrustCircle.VouchLocked.selector);
+        tc.rejectVouch(voucher);
+        vm.stopPrank();
+    }
+
+    function test_rejectVouch_noVouchReverts() public {
+        vm.prank(borrower);
+        vm.expectRevert(TrustCircle.NoVouch.selector);
+        tc.rejectVouch(voucher);
+    }
+
     function test_withdraw_partial() public {
         _vouch(voucher, borrower, 20e6);
         vm.prank(voucher);
@@ -385,6 +429,44 @@ contract LoanTest is TrustCircleTestBase {
         vm.expectRevert(TrustCircle.ActiveLoan.selector);
         tc.borrow(1e6);
         vm.stopPrank();
+    }
+
+    function test_borrow_dustReverts() public {
+        _vouch(voucher, borrower, 20e6);
+        vm.warp(block.timestamp + DELAY);
+        vm.prank(borrower);
+        vm.expectRevert(TrustCircle.BorrowTooSmall.selector);
+        tc.borrow(1e6 - 1);
+    }
+
+    /// @dev Pro-rata locking: any set of up to 10 vouchers and any amount within the limit locks exactly
+    ///      `amount`, never more than a voucher's own capped contribution.
+    function testFuzz_borrow_locksExactlyAmount(uint256 seed, uint8 count, uint256 amount) public {
+        count = uint8(bound(count, 1, 10));
+        address[] memory vs = new address[](count);
+        for (uint256 i; i < count; ++i) {
+            vs[i] = makeAddr(string.concat("fz", vm.toString(i)));
+            _register(vs[i]);
+            uint256 stake = bound(uint256(keccak256(abi.encode(seed, i))), 1e6, 60e6);
+            _vouch(vs[i], borrower, stake);
+        }
+        vm.warp(block.timestamp + DELAY);
+        uint256 limit = tc.availableLimit(borrower);
+        vm.assume(limit >= 1e6);
+        amount = bound(amount, 1e6, limit);
+
+        vm.prank(borrower);
+        tc.borrow(amount);
+
+        uint256 sum;
+        for (uint256 i; i < count; ++i) {
+            TrustCircle.Vouch memory v = tc.getVouch(vs[i], borrower);
+            assertLe(v.locked, v.amount < 40e6 ? v.amount : 40e6);
+            sum += v.locked;
+        }
+        assertEq(sum, amount);
+        assertEq(tc.totalLocked(), amount);
+        _assertSolvent();
     }
 
     function test_borrow_notHumanReverts() public {
