@@ -381,9 +381,10 @@ contract TrustCircle is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
     /// @notice Closes a loan that is past due plus the grace period. Anyone can call it; vouchers have the
     ///         incentive, since their unlent stake for this borrower stays frozen until then. Vouchers lose the
     ///         locked stake and the rest of their stake for this borrower becomes claimable.
-    /// @dev No liquidation reward and no automatic insurance payout: with Device-level World ID one person can
-    ///      hold several identities, and any automatic payout from the shared pool would let them drain it by
-    ///      defaulting to themselves. The pool only grows; the owner can compensate vouchers case by case.
+    /// @dev No liquidation reward and no automatic insurance payout: World ID without the Orb (Selfie Check)
+    ///      is not a hard one-person-one-identity guarantee, and any automatic payout from the shared pool would
+    ///      let someone with several identities drain it by defaulting to themselves. The pool only grows; the
+    ///      owner can compensate vouchers case by case.
     function liquidate(address borrower) external nonReentrant {
         Loan storage loan = loans[borrower];
         if (loan.status != LoanStatus.Active || block.timestamp <= loan.dueAt + GRACE_PERIOD) {

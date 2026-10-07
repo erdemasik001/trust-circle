@@ -670,7 +670,7 @@ contract LiquidationTest is TrustCircleTestBase {
         tc.vouchForUser(borrower, 1e6);
     }
 
-    /// @dev One person with three Device-level identities (voucher, borrower, keeper) defaults to themselves.
+    /// @dev One person with three World ID identities (voucher, borrower, keeper) defaults to themselves.
     ///      They must not end up with more USDC than they started with.
     function test_liquidate_sybilDefaultGainsNothing() public {
         _fundInsurance(25); // 5 USDC of other people's fees sit in the pool
