@@ -29,6 +29,12 @@ git submodule update --init --recursive
 cd contracts && forge test
 ```
 
+Arc's USDC is a system contract whose transfers go through an Arc precompile, so the fork tests that move real USDC (`test/fork/TrustCircleCycle.fork.t.sol`) need [Arc Foundry](https://github.com/circlefin/arc-foundry); plain `forge` skips them. CI runs everything with Arc Foundry:
+
+```bash
+cd contracts && arc-forge test --network arc
+```
+
 ```bash
 cd web && npm install && npm run dev
 ```

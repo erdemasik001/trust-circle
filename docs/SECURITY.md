@@ -45,6 +45,7 @@ A voucher's stake is their own money, and a loan is funded only by its vouchers'
 
 - Unit tests for registration, escrow, limits, the 40% voucher cap, repayment, liquidation, blocklisted vouchers, vouch rejection, beta limits and pause.
 - Fuzz test: for any 1–10 vouchers and any amount within the limit, pro-rata locking locks exactly the loan amount and never more than a voucher's capped contribution.
+- Fork tests against Arc's real USDC (Arc Foundry, forked Arc testnet): a full vouch → borrow → repay → claim → withdraw cycle and a liquidation, checking that the contract's native balance always equals its ERC-20 balance.
 - Invariant test: under random sequences of vouch, withdraw, borrow, repay, liquidate, claim and time jumps (and with any unexpected revert counted as a failure), the contract's USDC balance always covers `escrow + claimable + insurance pool + protocol fees`.
 
 ## Slither (0.11.4)
