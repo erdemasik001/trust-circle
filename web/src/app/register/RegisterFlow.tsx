@@ -1,6 +1,7 @@
 "use client";
 
 import { IDKitRequestWidget, type IDKitResult, type RpContext } from "@worldcoin/idkit";
+import Link from "next/link";
 import { useState } from "react";
 import type { Hash } from "viem";
 import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
@@ -65,6 +66,9 @@ export default function RegisterFlow() {
         <p className="text-lg font-medium">You are registered as a verified human.</p>
         <p className="text-foreground/70">Friends can now vouch for you, and you can vouch for them.</p>
         {hash && <TxLink hash={hash}>View registration transaction</TxLink>}
+        <Link href="/" className="mt-2 self-start rounded-full bg-foreground px-5 py-2 text-background">
+          Go to your dashboard
+        </Link>
       </div>
     );
   }
