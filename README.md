@@ -15,11 +15,25 @@ Every member is a unique, verified human (World ID). A voucher stakes USDC for s
 ## Repository
 ```
 contracts/   Foundry: TrustCircle, tests, deploy + attestation scripts
-web/         Next.js + wagmi + viem
+web/         Next.js + wagmi + viem: register, vouch, borrow, repay, claim
 docs/        SECURITY.md — trust assumptions, beta limits, Slither
              testnet-rehearsal.md — a full cycle on Arc testnet with tx hashes
              archive/ — earlier design notes
 ```
+
+## The app
+| Page | What it does |
+|---|---|
+| `/register` | Verify with World ID (Selfie Check) and register the wallet in one transaction. |
+| `/` | A member's dashboard: reputation and tier, the borrow form with a quote of fee, interest and due date, the open loan with a repay button, who vouches for them (an unwanted vouch can be declined), whom they vouch for, and interest ready to claim. |
+| `/u/<address>` | A member's public profile. The borrower shares this link; a friend opens it to vouch (approve + stake), add to a stake or withdraw the part that is not lent out. Anyone can close a loan here once it is past its grace period. |
+
+Amounts, limits, fees and waiting periods are read from the contract, so the app shows whatever the deployment enforces. Every action is simulated before the wallet is asked to sign, and a revert is shown as the contract's own reason (for example "You can borrow up to 10.00 USDC right now").
+
+## Deployments
+| Network | TrustCircle |
+|---|---|
+| Arc testnet (`5042002`) | [`0xe4b2F7fDb7960160C8003409c2a9eb97046A0b06`](https://testnet.arcscan.app/address/0xe4b2f7fdb7960160c8003409c2a9eb97046a0b06) (verified) |
 
 ## Develop
 Requires [Foundry](https://getfoundry.sh) and Node 22.
