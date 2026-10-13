@@ -7,8 +7,8 @@ export const USDC_DECIMALS = 6;
 
 type Deployment = { trustCircle?: Address };
 
-// Filled in after deploy (testnet G3, mainnet G4).
+// From contracts/deployments/arc-*.json.
 export const deployments: Record<SupportedChainId, Deployment> = {
-  [arc.id]: {},
+  [arc.id]: { trustCircle: "0x36307eFf9D3E446754184De2E7d355511521A95E" },
   [arcTestnet.id]: { trustCircle: "0xe4b2F7fDb7960160C8003409c2a9eb97046A0b06" },
 };

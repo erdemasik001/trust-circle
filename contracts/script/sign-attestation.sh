@@ -11,6 +11,7 @@
 #                World ID nullifier hash instead; an invite nullifier never collides with one.
 #   DEADLINE     default: now + 1 hour (unix seconds)
 #   SIGNER_ARGS  default: "--account attester" (keystore); e.g. "--private-key 0x…" for local tests
+#   SEND_ARGS    optional: also send the register transaction from <wallet>, e.g. "--account borrower"
 #   TC, CHAIN_ID, RPC_URL  default: read from deployments/arc-<network>.json and the Arc RPC
 set -euo pipefail
 
@@ -82,3 +83,9 @@ signature  $sig
 Register (as $wallet):
 cast send $tc "register(uint256,uint256,bytes)" $nullifier $deadline $sig --account <wallet> --rpc-url $rpc
 EOF
+
+if [ -n "${SEND_ARGS:-}" ]; then
+  echo
+  # shellcheck disable=SC2086 # SEND_ARGS is intentionally split into flags
+  cast send "$tc" 'register(uint256,uint256,bytes)' "$nullifier" "$deadline" "$sig" $SEND_ARGS --rpc-url "$rpc"
+fi

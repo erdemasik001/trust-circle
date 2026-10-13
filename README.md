@@ -4,7 +4,7 @@
 
 Every member is a unique, verified human (World ID). A voucher stakes USDC for someone they trust; that stake is held in escrow by the contract and sets the borrower's limit. When the borrower repays, vouchers earn 80% of the interest and the borrower's reputation grows, unlocking higher tiers. If the borrower defaults, the vouchers' stake covers the loss.
 
-> Status: **in development for Arc Microgrants (Oct 2026).** Unaudited — mainnet beta is capped at 100 USDC per loan and 2,000 USDC total.
+> Status: **live on Arc mainnet as a capped beta**, built for Arc Microgrants (Oct 2026). Unaudited: loans are capped at 100 USDC each and total stakes at 2,000 USDC.
 
 ## Why Arc
 - **USDC is gas.** Members only ever hold USDC: no second token, which matters for people who have never used crypto.
@@ -33,6 +33,7 @@ Amounts, limits, fees and waiting periods are read from the contract, so the app
 ## Deployments
 | Network | TrustCircle |
 |---|---|
+| Arc mainnet (`5042`) | [`0x36307eFf9D3E446754184De2E7d355511521A95E`](https://explorer.arc.io/address/0x36307eFf9D3E446754184De2E7d355511521A95E), deployed in [`0xce66df72…`](https://explorer.arc.io/tx/0xce66df72026f8f492049daec54ea1189b919cc9d86133aac70d5494d7e59d653), source verified on [Sourcify](https://sourcify.dev/server/v2/contract/5042/0x36307eFf9D3E446754184De2E7d355511521A95E) (exact match) |
 | Arc testnet (`5042002`) | [`0xe4b2F7fDb7960160C8003409c2a9eb97046A0b06`](https://testnet.arcscan.app/address/0xe4b2f7fdb7960160c8003409c2a9eb97046a0b06) (verified) |
 
 ## Develop

@@ -9,7 +9,7 @@ Submit at <https://dorahacks.io/hackathon/arc-microgrants> before **14 Oct 2026,
 | Live link | _the hosted app, set to mainnet_ |
 | Repo | <https://github.com/erdemasik001/trust-circle> |
 | Builder profile | <https://github.com/erdemasik001> |
-| Mainnet contract | _from `contracts/deployments/arc-mainnet.json` after the deploy_ |
+| Mainnet contract | [`0x36307eFf9D3E446754184De2E7d355511521A95E`](https://explorer.arc.io/address/0x36307eFf9D3E446754184De2E7d355511521A95E) |
 | Payout wallet | _an address that can receive USDC on Arc_ |
 
 ## Description (146 words)
