@@ -49,7 +49,10 @@ export default function RegisterFlow() {
   const receipt = useWaitForTransactionReceipt({ hash: hash ?? undefined, query: { enabled: Boolean(hash) } });
 
   if (!trustCircleAddress) return <Notice>TrustCircle is not deployed on {defaultChain.name} yet.</Notice>;
-  if (!worldConfigured) return <Notice>World ID is not configured (NEXT_PUBLIC_WORLD_RP_ID).</Notice>;
+  // NEXT_PUBLIC_WORLD_APP_ID or NEXT_PUBLIC_WORLD_RP_ID is not set for this build.
+  if (!worldConfigured) {
+    return <Notice>Registration with World ID is not open on this deployment yet. The first members are being added by invite.</Notice>;
+  }
 
   if (!isConnected || !address || !onRightChain) {
     return (

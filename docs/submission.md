@@ -6,7 +6,7 @@ Submit at <https://dorahacks.io/hackathon/arc-microgrants> before **14 Oct 2026,
 
 | Field | Value |
 |---|---|
-| Live link | _the hosted app, set to mainnet_ |
+| Live link | <https://trust-circle-two.vercel.app> (a member's page with live mainnet data: <https://trust-circle-two.vercel.app/u/0x97174becF0fB0dF8Bb9d55cAF13cCb403d7F8490>) |
 | Repo | <https://github.com/erdemasik001/trust-circle> |
 | Builder profile | <https://github.com/erdemasik001> |
 | Mainnet contract | [`0x36307eFf9D3E446754184De2E7d355511521A95E`](https://explorer.arc.io/address/0x36307eFf9D3E446754184De2E7d355511521A95E) |

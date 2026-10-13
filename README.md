@@ -4,6 +4,8 @@
 
 Every member is a unique, verified human (World ID). A voucher stakes USDC for someone they trust; that stake is held in escrow by the contract and sets the borrower's limit. When the borrower repays, vouchers earn 80% of the interest and the borrower's reputation grows, unlocking higher tiers. If the borrower defaults, the vouchers' stake covers the loss.
 
+**Live app: <https://trust-circle-two.vercel.app>** (Arc mainnet)
+
 > Status: **live on Arc mainnet as a capped beta**, built for Arc Microgrants (Oct 2026). Unaudited: loans are capped at 100 USDC each and total stakes at 2,000 USDC.
 
 ## Why Arc
