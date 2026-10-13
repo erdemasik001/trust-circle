@@ -7,22 +7,22 @@ export default function TxStatus({ state, done = "Done." }: { state: TxState; do
     case "idle":
       return null;
     case "preparing":
-      return <p className="text-sm text-foreground/70">Preparing…</p>;
+      return <p className="text-sm text-muted">Preparing…</p>;
     case "wallet":
-      return <p className="text-sm text-foreground/70">Confirm in your wallet: {state.label}</p>;
+      return <p className="text-sm text-muted">Confirm in your wallet: {state.label}</p>;
     case "confirming":
       return (
-        <p className="text-sm text-foreground/70">
+        <p className="text-sm text-muted">
           Waiting for confirmation: <TxLink hash={state.hash} />
         </p>
       );
     case "success":
       return (
-        <p className="text-sm text-green-700 dark:text-green-400">
+        <p className="text-sm text-accent">
           {done} <TxLink hash={state.hash}>View transaction</TxLink>
         </p>
       );
     case "error":
-      return <p className="text-sm text-red-600">{state.message}</p>;
+      return <p className="text-sm text-danger">{state.message}</p>;
   }
 }

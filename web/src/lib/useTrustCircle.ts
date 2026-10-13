@@ -70,6 +70,12 @@ export function useProtocol() {
       { ...tc, functionName: "VOUCHER_INTEREST_BPS" },
       { ...tc, functionName: "LOAN_DURATION" },
       { ...tc, functionName: "GRACE_PERIOD" },
+      { ...tc, functionName: "totalStaked" },
+      { ...tc, functionName: "totalLent" },
+      { ...tc, functionName: "INITIAL_REPUTATION" },
+      { ...tc, functionName: "RISING_REPUTATION" },
+      { ...tc, functionName: "TRUSTED_REPUTATION" },
+      { ...tc, functionName: "LEADER_REPUTATION" },
       { ...tc, functionName: "tierParams", args: [0] },
       { ...tc, functionName: "tierParams", args: [1] },
       { ...tc, functionName: "tierParams", args: [2] },
@@ -78,10 +84,15 @@ export function useProtocol() {
     query: {
       enabled: Boolean(trustCircleAddress),
       staleTime: REFRESH_MS,
-      select: ([paused, activationDelay, beta, minVouch, minBorrow, feeBps, shareBps, voucherBps, duration, grace, ...tiers]) => ({
+      select: ([paused, activationDelay, beta, minVouch, minBorrow, feeBps, shareBps, voucherBps, duration, grace, staked, lent, rep0, rep1, rep2, rep3, ...tiers]) => ({
         paused,
         activationDelay: Number(activationDelay),
         maxBorrowPerUser: beta[0],
+        maxTierOpen: beta[2],
+        totalStaked: staked,
+        totalLent: lent,
+        /** Reputation at which each tier starts, by tier index. */
+        tierReputation: [rep0, rep1, rep2, rep3],
         minVouch,
         minBorrow,
         insuranceFeeBps: feeBps,

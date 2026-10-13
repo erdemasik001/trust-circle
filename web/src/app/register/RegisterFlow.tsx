@@ -7,6 +7,7 @@ import type { Hash } from "viem";
 import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import ConnectButton from "@/components/ConnectButton";
 import TxLink from "@/components/TxLink";
+import { Button, Notice, Verified, buttonClass } from "@/components/ui";
 import type { Attestation } from "@/lib/attestation";
 import { defaultChain } from "@/lib/chains";
 import { trustCircleAbi, trustCircleAddress } from "@/lib/trustCircle";
@@ -57,7 +58,7 @@ export default function RegisterFlow() {
   if (!isConnected || !address || !onRightChain) {
     return (
       <div className="flex flex-col items-start gap-4">
-        <p>Connect the wallet you want to register. One World ID can register one wallet, once.</p>
+        <p className="text-sm leading-relaxed text-muted">Connect the wallet you want to register.</p>
         <ConnectButton />
       </div>
     );
@@ -65,11 +66,11 @@ export default function RegisterFlow() {
 
   if (receipt.isSuccess || isHuman.data) {
     return (
-      <div className="flex flex-col gap-2">
-        <p className="text-lg font-medium">You are registered as a verified human.</p>
-        <p className="text-foreground/70">Friends can now vouch for you, and you can vouch for them.</p>
+      <div className="flex flex-col gap-3">
+        <Verified />
+        <p className="text-sm leading-relaxed text-muted">This wallet is registered. Friends can now vouch for you, and you can vouch for them.</p>
         {hash && <TxLink hash={hash}>View registration transaction</TxLink>}
-        <Link href="/" className="mt-2 self-start rounded-full bg-foreground px-5 py-2 text-background">
+        <Link href="/" className={`${buttonClass("primary")} self-start`}>
           Go to your dashboard
         </Link>
       </div>
@@ -120,28 +121,28 @@ export default function RegisterFlow() {
 
   return (
     <div className="flex flex-col items-start gap-4">
-      <ol className="list-decimal space-y-1 pl-5 text-foreground/80">
+      <ol className="list-decimal space-y-1 pl-5 text-sm leading-relaxed text-muted">
         <li>Verify with World ID in World App (Selfie Check, no Orb needed).</li>
         <li>Confirm one transaction that registers this wallet. The fee is paid in USDC.</li>
       </ol>
 
       {attestation && !hash ? (
-        <button className="rounded-full bg-foreground px-5 py-2 text-background disabled:opacity-50" disabled={busy} onClick={() => submit(attestation)}>
+        <Button disabled={busy} onClick={() => submit(attestation)}>
           {step === "submitting" ? "Confirm in your wallet…" : "Register on Arc"}
-        </button>
+        </Button>
       ) : (
-        <button className="rounded-full bg-foreground px-5 py-2 text-background disabled:opacity-50" disabled={busy} onClick={start}>
+        <Button disabled={busy} onClick={start}>
           {step === "signing" ? "Preparing…" : receipt.isLoading ? "Registering…" : "Verify with World ID"}
-        </button>
+        </Button>
       )}
 
       {hash && receipt.isLoading && (
-        <p className="text-sm">
+        <p className="text-sm text-muted">
           Waiting for confirmation: <TxLink hash={hash} />
         </p>
       )}
-      {receipt.isError && <p className="text-sm text-red-600">The registration transaction failed.</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {receipt.isError && <p className="text-sm text-danger">The registration transaction failed.</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       {rpContext && (
         <IDKitRequestWidget
@@ -165,8 +166,4 @@ export default function RegisterFlow() {
       )}
     </div>
   );
-}
-
-function Notice({ children }: { children: React.ReactNode }) {
-  return <p className="rounded-lg border border-foreground/20 p-4 text-sm">{children}</p>;
 }

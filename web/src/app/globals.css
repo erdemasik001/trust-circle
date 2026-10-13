@@ -1,26 +1,61 @@
 @import "tailwindcss";
 
+/* One dark theme: near-black surfaces, a lime accent, bordered cards. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0c0b;
+  --surface: #111413;
+  --raised: #191d1b;
+  --border: #252a28;
+  --foreground: #f4f6f5;
+  --muted: #98a19d;
+  --accent: #a8e85d;
+  --accent-foreground: #0a0c0b;
+  --danger: #ff7a70;
+  --warning: #f2c14e;
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --font-sans: var(--font-manrope);
+  --font-display: var(--font-unbounded);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  /* A bare `border` class draws in the theme's border colour. */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-manrope), system-ui, sans-serif;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+/* The lime glow behind the hero and in the corner of highlighted cards. */
+@utility glow-hero {
+  background-image: radial-gradient(60% 70% at 50% 0%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 72%);
+}
+
+@utility glow-corner {
+  background-image: radial-gradient(70% 90% at 100% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%);
 }

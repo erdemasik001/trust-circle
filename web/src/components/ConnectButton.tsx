@@ -1,7 +1,9 @@
 "use client";
 
 import { useConnect, useConnection, useConnectors, useDisconnect, useSwitchChain } from "wagmi";
+import { Button } from "@/components/ui";
 import { defaultChain } from "@/lib/chains";
+import { shortAddress } from "@/lib/format";
 
 export default function ConnectButton() {
   const { address, chainId, isConnected } = useConnection();
@@ -10,30 +12,27 @@ export default function ConnectButton() {
   const { mutate: disconnect } = useDisconnect();
   const { mutate: switchChain } = useSwitchChain();
 
-  if (!isConnected) {
+  if (!isConnected || !address) {
     const connector = connectors[0];
     return (
-      <button
-        className="rounded-full bg-foreground px-5 py-2 text-background disabled:opacity-50"
-        disabled={!connector || isPending}
-        onClick={() => connector && connect({ connector, chainId: defaultChain.id })}
-      >
+      <Button className="whitespace-nowrap" disabled={!connector || isPending} onClick={() => connector && connect({ connector, chainId: defaultChain.id })}>
         {isPending ? "Connecting…" : "Connect wallet"}
-      </button>
+      </Button>
     );
   }
 
   if (chainId !== defaultChain.id) {
     return (
-      <button className="rounded-full border px-5 py-2" onClick={() => switchChain({ chainId: defaultChain.id })}>
+      <Button variant="secondary" className="whitespace-nowrap border-warning/50 text-warning" onClick={() => switchChain({ chainId: defaultChain.id })}>
         Switch to {defaultChain.name}
-      </button>
+      </Button>
     );
   }
 
   return (
-    <button className="rounded-full border px-5 py-2 font-mono text-sm" onClick={() => disconnect()}>
-      {address?.slice(0, 6)}…{address?.slice(-4)}
-    </button>
+    <Button variant="secondary" className="whitespace-nowrap font-mono" title="Disconnect" onClick={() => disconnect()}>
+      <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+      {shortAddress(address)}
+    </Button>
   );
 }

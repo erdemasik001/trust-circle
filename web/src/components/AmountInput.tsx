@@ -11,11 +11,11 @@ type Props = {
 
 export default function AmountInput({ label, value, onChange, max, disabled }: Props) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-sm text-foreground/60">{label}</span>
-      <span className="flex items-center gap-3 rounded-xl border border-foreground/20 px-3 py-2 focus-within:border-foreground">
+    <label className="flex flex-col gap-1.5">
+      <span className="text-xs text-muted">{label}</span>
+      <span className="flex items-center gap-3 rounded-xl border border-transparent bg-raised px-4 py-3 transition focus-within:border-accent/60">
         <input
-          className="w-full min-w-0 bg-transparent text-lg tabular-nums outline-none disabled:opacity-50"
+          className="w-full min-w-0 bg-transparent text-xl font-semibold tabular-nums outline-none placeholder:text-muted/60 disabled:opacity-50"
           inputMode="decimal"
           autoComplete="off"
           placeholder="0.00"
@@ -24,11 +24,16 @@ export default function AmountInput({ label, value, onChange, max, disabled }: P
           onChange={(e) => onChange(e.target.value)}
         />
         {max !== undefined && (
-          <button type="button" className="text-sm underline underline-offset-4 disabled:opacity-50" disabled={disabled} onClick={() => onChange(formatUsdc(max))}>
+          <button
+            type="button"
+            className="rounded-md bg-accent/15 px-2 py-1 text-xs font-semibold text-accent transition hover:bg-accent/25 disabled:opacity-40"
+            disabled={disabled}
+            onClick={() => onChange(formatUsdc(max))}
+          >
             Max
           </button>
         )}
-        <span className="text-foreground/60">USDC</span>
+        <span className="text-sm font-semibold text-muted">USDC</span>
       </span>
     </label>
   );

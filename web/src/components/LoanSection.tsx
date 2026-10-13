@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Address } from "viem";
 import AmountInput from "@/components/AmountInput";
 import TxStatus from "@/components/TxStatus";
-import { Button, Card, Line, Notice } from "@/components/ui";
+import { Badge, Button, Card, Line, Notice } from "@/components/ui";
 import { displayBalance, displayUsdc, formatDate, formatDuration, tryParseUsdc } from "@/lib/format";
 import { LoanStatus, TIER_NAMES, loanPhase, quoteBorrow, vouchPhase, type Vouch } from "@/lib/loan";
 import type { Member, Protocol } from "@/lib/useTrustCircle";
@@ -42,15 +42,21 @@ export default function LoanSection({ account, member, protocol, backers, now }:
     }
 
     return (
-      <Card title="Your loan" aside={phase === "active" ? `Due ${formatDate(loan.dueAt)}` : "Overdue"}>
-        <div>
-          <p className="text-3xl font-semibold tabular-nums">{displayUsdc(owed)} USDC</p>
-          <p className="text-sm text-foreground/60">
+      <Card
+        title="Your loan"
+        glow
+        aside={phase === "active" ? <Badge>Due {formatDate(loan.dueAt)}</Badge> : <Badge tone="warning">Overdue</Badge>}
+      >
+        <div className="flex flex-col gap-1">
+          <p className="text-4xl font-bold tabular-nums">
+            {displayUsdc(owed)} <span className="text-lg font-semibold text-muted">USDC</span>
+          </p>
+          <p className="text-sm text-muted">
             to repay: {displayUsdc(loan.principal)} borrowed + {displayUsdc(loan.interest)} interest
           </p>
         </div>
         {phase === "active" && now !== undefined && (
-          <p className="text-sm">Repay within {formatDuration(loan.dueAt - now)} to raise your reputation.</p>
+          <p className="text-sm text-muted">Repay within {formatDuration(loan.dueAt - now)} to raise your reputation.</p>
         )}
         {phase === "overdue" && (
           <Notice tone="warning">
@@ -99,20 +105,22 @@ export default function LoanSection({ account, member, protocol, backers, now }:
   }
 
   return (
-    <Card title="Borrow" aside={`${TIER_NAMES[member.tier]} terms: ${percent(terms.interestBps)} interest`}>
+    <Card title="Borrow" glow aside={<Badge tone="neutral">{`${TIER_NAMES[member.tier]}: ${percent(terms.interestBps)} interest`}</Badge>}>
       {member.hasDefaulted ? (
-        <p className="text-sm">A loan from this wallet was closed as a default, so it can no longer borrow.</p>
+        <p className="text-sm leading-relaxed text-muted">A loan from this wallet was closed as a default, so it can no longer borrow.</p>
       ) : limit === 0n ? (
-        <p className="text-sm">{whyNoLimit(backers, Number(terms.minVouchers), now)}</p>
+        <p className="text-sm leading-relaxed text-muted">{whyNoLimit(backers, Number(terms.minVouchers), now)}</p>
       ) : (
         <>
-          <p className="text-sm">
-            You can borrow up to <span className="font-semibold tabular-nums">{displayUsdc(limit)} USDC</span>, backed by
-            your vouchers&apos; stakes.
-          </p>
+          <div className="flex flex-col gap-1">
+            <p className="text-xs text-muted">Available to borrow</p>
+            <p className="text-4xl font-bold tabular-nums">
+              {displayUsdc(limit)} <span className="text-lg font-semibold text-muted">USDC</span>
+            </p>
+          </div>
           <AmountInput label="Amount" value={input} onChange={setInput} max={limit} disabled={tx.busy || protocol.paused} />
           {quote && !problem && (
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2 rounded-xl bg-raised p-4">
               <Line label={`Insurance fee (${percent(protocol.insuranceFeeBps)})`}>{displayUsdc(quote.fee)} USDC</Line>
               <Line label="You receive">{displayUsdc(quote.received)} USDC</Line>
               <Line label={`Interest (${percent(terms.interestBps)})`}>{displayUsdc(quote.interest)} USDC</Line>
@@ -122,7 +130,7 @@ export default function LoanSection({ account, member, protocol, backers, now }:
               </Line>
             </div>
           )}
-          {problem && <p className="text-sm text-red-600">{problem}</p>}
+          {problem && <p className="text-sm text-danger">{problem}</p>}
           <Button className="self-start" disabled={tx.busy || protocol.paused || !amount || Boolean(problem)} onClick={borrow}>
             Borrow
           </Button>
