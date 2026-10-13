@@ -14,8 +14,6 @@ Submit at <https://dorahacks.io/hackathon/arc-microgrants> before **14 Oct 2026,
 
 ## Description (146 words)
 
-The last sentence is only true after the mainnet deploy; do not submit it before then.
-
 > Trust Circle lets people with no collateral or credit history borrow small amounts of USDC, backed by friends who vouch for them. Every member is a unique human verified with World ID. A friend stakes USDC for a borrower; the contract escrows the stake, which sets the borrower's limit and funds the loan. When the loan is repaid, vouchers earn 80% of the interest and the borrower's on-chain reputation grows, unlocking better terms. If the borrower defaults, the vouchers' lent stake covers the loss.
 >
 > Arc makes 10–100 USDC loans workable: USDC is the gas token, so members never hold a second asset; a borrower's whole cycle cost about 0.014 USDC in fees in our testnet rehearsal; and a repayment is final in under a second. The contract is live and verified on Arc mainnet, covered by unit, fuzz, invariant and Arc-fork tests, and capped while unaudited.
